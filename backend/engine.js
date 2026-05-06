@@ -67,7 +67,6 @@ function calculateResults(outcomes, processedAnswers, qKeys, upToQuestionIndex) 
         if (mappedLetter === questionInfo.correct) {
           correctCount += 1;
         } else if (mappedLetter === '' && questionInfo.correct) {
-          // Fallback if clinical text is just 'true' or 'false'
           if (normalizedAnswer === 'true' && questionInfo.options['true'] === questionInfo.correct) {
             correctCount += 1;
           } else if (normalizedAnswer === 'false' && questionInfo.options['false'] === questionInfo.correct) {
@@ -84,37 +83,40 @@ function calculateResults(outcomes, processedAnswers, qKeys, upToQuestionIndex) 
     });
   }
 
+  const currentQKey = qKeys[upToQuestionIndex - 1];
+  const currentQInfo = processedAnswers[upToQuestionIndex - 1];
+
   const rankedTeams = Object.values(teams).map(team => {
     const cumulativeScore = team.scores.reduce((sum, score) => sum + score, 0);
     const avgConsensus = team.correctPercentages.length > 0 
       ? team.correctPercentages.reduce((sum, pct) => sum + pct, 0) / team.correctPercentages.length
       : 0;
 
-return {
+    return {
       name: team.name,
       score: Math.round(cumulativeScore * 100) / 100,
       consensus: Math.round(avgConsensus * 100) / 100,
       N: team.N,
-      members: team.members.map(m => ({
-        id: m['Prime UserID'] || 'Unknown',
-        discipline: m['Discipline'] || 'N/A',
-        // Use the current question key to get the specific answer for this phase
-        rawAnswer: m[qKeys[upToQuestionIndex - 1]] || 'No Response'
-      }))
+      members: team.members.map(m => {
+        const raw = m[currentQKey] || 'No Response';
+        const norm = normalizeString(raw);
+        const mapped = currentQInfo.options[norm] || '';
+        return {
+          id: m['Prime UserID'] || 'Unknown',
+          discipline: m['Discipline'] || 'N/A',
+          rawAnswer: raw,
+          isCorrect: mapped === currentQInfo.correct || (mapped === '' && norm === currentQInfo.correct.toLowerCase())
+        };
+      })
     };
   });
 
   rankedTeams.sort((a, b) => {
-    if (Math.abs(b.score - a.score) > 0.001) {
-      return b.score - a.score;
-    }
+    if (Math.abs(b.score - a.score) > 0.001) return b.score - a.score;
     return b.consensus - a.consensus;
   });
 
-  rankedTeams.forEach((team, index) => {
-    team.rank = index + 1;
-  });
-
+  rankedTeams.forEach((team, index) => { team.rank = index + 1; });
   return rankedTeams;
 }
 
@@ -147,11 +149,17 @@ function generateAllSnapshots(outcomes, answers) {
 
     const classCorrectPercentage = totalN > 0 ? Math.round((totalCorrect / totalN) * 100) : 0;
 
+// Find the text that corresponds to the correct letter (e.g., "F")
+    const correctOptionEntry = Object.entries(questionInfo.options).find(
+      ([text, letter]) => letter === questionInfo.correct
+    );
+    const fullCorrectText = correctOptionEntry ? correctOptionEntry[0] : questionInfo.correct;
+
     snapshots.push({
       questionIndex: i,
       questionInfo: {
         text: questionInfo.text,
-        correctAnswer: questionInfo.correct,
+        correctAnswer: fullCorrectText, // Now sends the full text like "EGD with biopsy..."
         classCorrectPercentage: classCorrectPercentage
       },
       leaderboard: calculateResults(outcomes, processedAnswers, qKeys, i)

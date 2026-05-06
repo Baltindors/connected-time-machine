@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen flex flex-col font-sans bg-slate-900 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] relative">
+  <div class="h-screen overflow-hidden flex flex-col font-sans bg-slate-900 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] relative">
     <!-- Premium background elements -->
     <div class="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
       <div class="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-indigo-600/20 blur-[120px]"></div>
@@ -30,8 +30,9 @@
     </header>
 
     <!-- Main Content -->
-    <main class="flex-grow relative z-10 p-6 overflow-y-auto">
-      <div class="max-w-6xl mx-auto">
+<main class="flex-grow relative z-10 p-6 overflow-hidden flex flex-col min-h-0">
+      <div class="max-w-6xl mx-auto w-full flex-grow flex flex-col min-h-0">
+        
         <div v-if="isLoading" class="flex flex-col items-center justify-center h-64 gap-4">
           <div class="w-12 h-12 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin"></div>
           <p class="text-indigo-400 font-bold tracking-widest uppercase text-sm animate-pulse">Running Consensus Engine...</p>
@@ -42,15 +43,14 @@
           <p class="text-rose-300/80 text-sm">{{ error }}</p>
         </div>
 
-        <div v-else class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <!-- Left Column: Active Question -->
-          <div class="lg:col-span-5 space-y-6">
+        <div v-else class="grid grid-cols-1 lg:grid-cols-12 gap-8 flex-grow min-h-0">
+          
+          <div class="lg:col-span-5 space-y-6 overflow-y-auto pr-2 custom-scrollbar">
             <QuestionCard 
               :questionIndex="currentQuestionIndex"
               :questionInfo="questionInfo"
             />
             
-            <!-- Context Box -->
             <div class="bg-slate-800/30 border border-slate-700/50 rounded-xl p-5 text-sm text-slate-400 leading-relaxed shadow-inner">
               <h3 class="font-bold text-slate-300 mb-2 flex items-center gap-2">
                 <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -64,15 +64,15 @@
             </div>
           </div>
 
-          <!-- Right Column: Leaderboard -->
-          <div class="lg:col-span-7 space-y-6">
+          <div class="lg:col-span-7 flex flex-col min-h-0">
             <Leaderboard 
               :teams="rankedTeams" 
               @select-team="name => selectedTeamName = name" 
+              class="flex-grow min-h-0"
             />
 
-            <div v-if="selectedTeamDetails" class="mt-6 bg-slate-800/40 border border-indigo-500/30 rounded-xl p-4 backdrop-blur-md">
-              <div class="flex justify-between items-center mb-4">
+            <div v-if="selectedTeamDetails" class="mt-4 bg-slate-800/40 border border-indigo-500/30 rounded-xl p-4 backdrop-blur-md max-h-[40%] overflow-y-auto custom-scrollbar">
+              <div class="flex justify-between items-center mb-4 sticky top-0 bg-slate-800/80 backdrop-blur pb-2">
                 <h3 class="text-indigo-400 font-bold uppercase text-xs tracking-widest">
                   Team Breakdown: {{ selectedTeamName }}
                 </h3>
@@ -86,7 +86,7 @@
                     <span class="text-slate-500 text-[10px]">ID: {{ member.id }}</span>
                   </div>
                   <div class="text-right">
-                    <span :class="member.rawAnswer === questionInfo.correctAnswer ? 'text-emerald-400' : 'text-rose-400'" class="text-xs font-bold">
+                    <span :class="member.isCorrect ? 'text-emerald-400' : 'text-rose-400'" class="text-xs font-bold">
                       {{ member.rawAnswer || 'No Response' }}
                     </span>
                   </div>
