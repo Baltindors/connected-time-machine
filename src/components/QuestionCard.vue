@@ -1,8 +1,8 @@
 <template>
   <div class="bg-slate-800/50 backdrop-blur border border-slate-700/50 p-6 rounded-2xl shadow-xl transition-all duration-300 hover:shadow-2xl hover:border-slate-600/50">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="text-xs font-bold uppercase tracking-widest text-slate-400">Current Event Phase</h2>
-      <div class="px-3 py-1 bg-indigo-500/10 text-indigo-400 rounded-full text-xs font-bold border border-indigo-500/20">
+    <div class="flex items-center justify-between mb-2">
+      <h2 class="text-[10px] font-bold uppercase tracking-widest text-slate-500">Current Event Phase</h2>
+      <div class="px-2 py-0.5 bg-indigo-500/10 text-indigo-400 rounded-full text-[10px] font-bold border border-indigo-500/20">
         Question {{ questionIndex }}
       </div>
     </div>
@@ -26,17 +26,22 @@
 </span>
         </div>
         
-        <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700/30 flex flex-col justify-center">
-          <span class="text-xs text-slate-500 mb-1">Overall Class Accuracy</span>
+        <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700/30 flex flex-col justify-center relative overflow-hidden">
+          <span class="text-[10px] uppercase tracking-widest font-bold text-slate-500 mb-1">
+            {{ selectedTeam ? `${selectedTeam.name} Consensus` : 'Overall Class Accuracy' }}
+          </span>
           <div class="flex items-end gap-2">
-            <span class="text-2xl font-bold" :class="accuracyColor">
-              {{ questionInfo.classCorrectPercentage }}%
+            <span class="text-2xl font-bold tabular-nums" :class="accuracyColor">
+              {{ displayPercentage }}%
             </span>
             <div class="w-full bg-slate-800 h-2 rounded-full mb-1 ml-2 overflow-hidden">
-              <div class="h-full rounded-full transition-all duration-1000 ease-out" 
+              <div class="h-full rounded-full transition-all duration-700 ease-out" 
                    :class="accuracyBgColor"
-                   :style="{ width: `${questionInfo.classCorrectPercentage}%` }"></div>
+                   :style="{ width: `${displayPercentage}%` }"></div>
             </div>
+          </div>
+          <div v-if="selectedTeam" class="absolute top-2 right-2 px-2 py-0.5 bg-indigo-500/20 rounded border border-indigo-500/40 text-[10px] font-black text-indigo-300">
+            +{{ selectedTeam.currentQuestionScore }} PTS
           </div>
         </div>
       </div>
@@ -59,18 +64,28 @@ const props = defineProps({
   questionInfo: {
     type: Object,
     default: null
+  },
+  selectedTeam: { // Added selectedTeam prop
+    type: Object,
+    default: null
   }
 });
 
+// Switch display between Class and Team data
+const displayPercentage = computed(() => {
+  if (props.selectedTeam) return props.selectedTeam.currentQuestionConsensus;
+  return props.questionInfo?.classCorrectPercentage || 0;
+});
+
 const accuracyColor = computed(() => {
-  const pct = props.questionInfo?.classCorrectPercentage || 0;
+  const pct = displayPercentage.value;
   if (pct >= 80) return 'text-emerald-400';
   if (pct >= 50) return 'text-amber-400';
   return 'text-rose-400';
 });
 
 const accuracyBgColor = computed(() => {
-  const pct = props.questionInfo?.classCorrectPercentage || 0;
+  const pct = displayPercentage.value;
   if (pct >= 80) return 'bg-emerald-400';
   if (pct >= 50) return 'bg-amber-400';
   return 'bg-rose-400';

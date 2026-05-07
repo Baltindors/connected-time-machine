@@ -86,22 +86,29 @@ function calculateResults(outcomes, processedAnswers, qKeys, upToQuestionIndex) 
   const currentQKey = qKeys[upToQuestionIndex - 1];
   const currentQInfo = processedAnswers[upToQuestionIndex - 1];
 
-  const rankedTeams = Object.values(teams).map(team => {
+const rankedTeams = Object.values(teams).map(team => {
     const cumulativeScore = team.scores.reduce((sum, score) => sum + score, 0);
     const avgConsensus = team.correctPercentages.length > 0 
       ? team.correctPercentages.reduce((sum, pct) => sum + pct, 0) / team.correctPercentages.length
       : 0;
 
+    // Capture stats for the single question currently in the snapshot
+    const qScore = team.scores[upToQuestionIndex - 1] || 0;
+    const qConsensus = team.correctPercentages[upToQuestionIndex - 1] || 0;
+
     return {
       name: team.name,
       score: Math.round(cumulativeScore * 100) / 100,
       consensus: Math.round(avgConsensus * 100) / 100,
+      currentQuestionScore: Math.round(qScore * 100) / 100, // Points for this specific question
+      currentQuestionConsensus: Math.round(qConsensus * 100) / 100, // Consensus for this specific question
       N: team.N,
       members: team.members.map(m => {
         const raw = m[currentQKey] || 'No Response';
         const norm = normalizeString(raw);
         const mapped = currentQInfo.options[norm] || '';
         return {
+          sessionID: m.SessionID || 'Unknown', // Added SessionID from outcomes
           id: m['Prime UserID'] || 'Unknown',
           discipline: m['Discipline'] || 'N/A',
           rawAnswer: raw,

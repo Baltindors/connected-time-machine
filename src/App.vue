@@ -8,7 +8,7 @@
 
     <!-- Header -->
     <header class="relative z-10 p-6 border-b border-slate-800/50 bg-slate-900/50 backdrop-blur-sm">
-      <div class="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+      <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
         <div>
           <h1 class="text-3xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400 drop-shadow-sm">
             ConnectED Time-Machine
@@ -31,7 +31,7 @@
 
     <!-- Main Content -->
 <main class="flex-grow relative z-10 p-6 overflow-hidden flex flex-col min-h-0">
-      <div class="max-w-6xl mx-auto w-full flex-grow flex flex-col min-h-0">
+      <div class="max-w-7xl mx-auto w-full flex-grow flex flex-col min-h-0">
         
         <div v-if="isLoading" class="flex flex-col items-center justify-center h-64 gap-4">
           <div class="w-12 h-12 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin"></div>
@@ -45,33 +45,14 @@
 
         <div v-else class="grid grid-cols-1 lg:grid-cols-12 gap-8 flex-grow min-h-0">
           
-          <div class="lg:col-span-5 space-y-6 overflow-y-auto pr-2 custom-scrollbar">
+          <div class="lg:col-span-6 space-y-6 flex flex-col min-h-0 overflow-hidden">
             <QuestionCard 
               :questionIndex="currentQuestionIndex"
               :questionInfo="questionInfo"
+              :selectedTeam="selectedTeamDetails"
             />
             
-            <div class="bg-slate-800/30 border border-slate-700/50 rounded-xl p-5 text-sm text-slate-400 leading-relaxed shadow-inner">
-              <h3 class="font-bold text-slate-300 mb-2 flex items-center gap-2">
-                <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                Engine Rules
-              </h3>
-              <ul class="list-disc list-inside space-y-1 ml-1 opacity-80 text-xs">
-                <li><strong class="text-slate-300">Score:</strong> 10 × (Correct Answers / Team Size)</li>
-                <li><strong class="text-slate-300">Consensus:</strong> Average team accuracy up to current phase</li>
-                <li>Non-responses map to incorrect</li>
-              </ul>
-            </div>
-          </div>
-
-          <div class="lg:col-span-7 flex flex-col min-h-0">
-            <Leaderboard 
-              :teams="rankedTeams" 
-              @select-team="name => selectedTeamName = name" 
-              class="flex-grow min-h-0"
-            />
-
-            <div v-if="selectedTeamDetails" class="mt-4 bg-slate-800/40 border border-indigo-500/30 rounded-xl p-4 backdrop-blur-md max-h-[40%] overflow-y-auto custom-scrollbar">
+            <div v-if="selectedTeamDetails" class="bg-slate-800/40 border border-indigo-500/30 rounded-xl p-4 backdrop-blur-md flex-grow overflow-y-auto custom-scrollbar min-h-0">
               <div class="flex justify-between items-center mb-4 sticky top-0 bg-slate-800/80 backdrop-blur pb-2">
                 <h3 class="text-indigo-400 font-bold uppercase text-xs tracking-widest">
                   Team Breakdown: {{ selectedTeamName }}
@@ -79,20 +60,33 @@
                 <button @click="selectedTeamName = null" class="text-slate-500 hover:text-slate-300 text-xs underline">Close</button>
               </div>
               <div class="space-y-2">
-                <div v-for="member in selectedTeamDetails.members" :key="member.id" 
-                    class="flex justify-between items-center bg-slate-900/60 p-3 rounded-lg border border-slate-700/50">
-                  <div class="flex flex-col">
-                    <span class="text-slate-200 font-medium text-sm">{{ member.discipline }}</span>
-                    <span class="text-slate-500 text-[10px]">ID: {{ member.id }}</span>
-                  </div>
+                <div class="grid grid-cols-4 px-3 text-[10px] uppercase font-bold text-slate-500 mb-1 tracking-widest">
+                  <span>Session</span>
+                  <span>User ID</span>
+                  <span>Answer</span>
+                  <span class="text-right">Result</span>
+                </div>
+                <div v-for="member in selectedTeamDetails.members" :key="member.sessionID + member.id" 
+                    class="grid grid-cols-4 items-center bg-slate-900/60 p-3 rounded-lg border border-slate-700/50 transition-colors hover:bg-slate-900/90">
+                  <span class="text-slate-500 text-[10px] font-mono truncate pr-2">{{ member.sessionID }}</span>
+                  <span class="text-slate-200 font-medium text-sm">{{ member.id }}</span>
+                  <span class="text-slate-400 text-[11px] italic truncate pr-2">"{{ member.rawAnswer || 'No Resp' }}"</span>
                   <div class="text-right">
-                    <span :class="member.isCorrect ? 'text-emerald-400' : 'text-rose-400'" class="text-xs font-bold">
-                      {{ member.rawAnswer || 'No Response' }}
+                    <span :class="member.isCorrect ? 'text-emerald-400' : 'text-rose-500'" class="text-[10px] font-black uppercase">
+                      {{ member.isCorrect ? 'Correct' : 'Wrong' }}
                     </span>
                   </div>
                 </div>
               </div>
             </div> 
+          </div>
+
+          <div class="lg:col-span-6 flex flex-col min-h-0">
+            <Leaderboard 
+              :teams="rankedTeams" 
+              @select-team="name => selectedTeamName = name" 
+              class="flex-grow min-h-0"
+            />
           </div>
         </div>
       </div>
@@ -122,6 +116,8 @@ const {
   currentQuestionIndex,
   rankedTeams,
   questionInfo,
+  selectedTeamName,    
+  selectedTeamDetails,
   isLoading,
   error,
   fetchResults

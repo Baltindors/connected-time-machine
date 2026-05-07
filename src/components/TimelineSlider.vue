@@ -7,25 +7,26 @@
         <span>End</span>
       </div>
       
-      <div class="relative pt-1 pb-4">
+      <div class="relative flex items-center py-4">
+        <div class="absolute w-full h-2 bg-slate-700 rounded-lg z-0"></div>
+
+        <div 
+          class="absolute left-0 h-2 bg-gradient-to-r from-indigo-500 to-cyan-400 rounded-l-lg pointer-events-none z-10"
+          :style="{ width: `${progressPercentage}%` }"
+        ></div>
+
         <input 
           type="range" 
           :min="min" 
           :max="max" 
           :value="modelValue"
           @input="$emit('update:modelValue', parseInt($event.target.value))"
-          class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all slider-thumb"
+          class="w-full h-2 bg-transparent appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all slider-thumb relative z-20"
         />
-        <!-- Custom Track Fill -->
-        <div 
-          class="absolute top-[4px] left-0 h-2 bg-gradient-to-r from-indigo-500 to-cyan-400 rounded-l-lg pointer-events-none"
-          :style="{ width: `${progressPercentage}%` }"
-        ></div>
         
-        <!-- Tick marks -->
-        <div class="absolute top-8 left-0 w-full flex justify-between px-1 pointer-events-none">
+        <div class="absolute top-full left-0 w-full flex justify-between px-1 pointer-events-none -mt-2">
           <span 
-            v-for="tick in max" 
+            v-for="tick in max"
             :key="tick"
             class="text-[10px] font-bold w-4 text-center transition-colors duration-300"
             :class="tick <= modelValue ? 'text-cyan-400' : 'text-slate-600'"
