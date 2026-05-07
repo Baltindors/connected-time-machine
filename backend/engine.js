@@ -1,51 +1,118 @@
 function normalizeString(str) {
-  if (!str) return '';
+  if (!str) return "";
   // Trimming, lowercasing, and normalizing whitespace
-  return str.toString().trim().toLowerCase().replace(/\s+/g, ' ');
+  return str.toString().trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 function processAnswers(answers) {
-  return answers.map(ans => {
+  return answers
+    .map((ans) => {
+      const options = {};
+      ["a", "b", "c", "d", "e", "f", "g", "h"].forEach((letter) => {
+        const key = `answer_${letter}`;
+        if (ans[key]) {
+          options[normalizeString(ans[key])] = letter.toUpperCase();
+        }
+      });
+
+      return {
+        qIndex: parseInt(ans.question_number),
+        text: ans.question_text,
+        correct: (ans.correct || "").trim().toUpperCase(),
+        options,
+      };
+    })
+    .sort((a, b) => a.qIndex - b.qIndex);
+}
+
+function normalizeString(str) {
+  if (!str) return "";
+  return str.toString().trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/**
+ * Bridges the new DB format to the structure the existing engine logic expects.
+ */
+function transformData(sessions, answersDb, answersText) {
+  const optionIdToText = {};
+  const questionIdToQIndex = {};
+  const qKeys = ["Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8"];
+
+  // 1. Map IDs to human-readable text from answers.csv
+  const processedAnswers = answersText.map((ansText, idx) => {
+    const qNum = idx + 1;
+    const dbRow = answersDb.find((d) => parseInt(d.question_number) === qNum);
     const options = {};
-    ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].forEach(letter => {
-      const key = `answer_${letter}`;
-      if (ans[key]) {
-        options[normalizeString(ans[key])] = letter.toUpperCase();
-      }
-    });
 
-    return {
-      qIndex: parseInt(ans.question_number),
-      text: ans.question_text,
-      correct: (ans.correct || '').trim().toUpperCase(),
-      options
-    };
-  }).sort((a, b) => a.qIndex - b.qIndex);
-}
-
-function getQuestionKeys(outcomes) {
-  // Extract the last 8 columns from the first row as the keys for questions 1-8
-  if (outcomes.length === 0) return [];
-  const keys = Object.keys(outcomes[0]);
-  return keys.slice(-8); // We have 8 questions
-}
-
-function calculateResults(outcomes, processedAnswers, qKeys, upToQuestionIndex) {
-  const teams = {};
-
-  outcomes.forEach(row => {
-    let teamName = (row.Team || row.team_name || '').trim();
-    if (!teamName || teamName.toLowerCase() === 'noteamwalkin') {
-      teamName = 'Phoenix';
+    if (dbRow) {
+      questionIdToQIndex[dbRow.question_ID] = qNum;
+      ["a", "b", "c", "d", "e", "f", "g", "h"].forEach((l) => {
+        const id = dbRow[`answer_${l}`];
+        const text = ansText[`answer_${l}`];
+        if (id && text) {
+          optionIdToText[id] = text;
+          options[normalizeString(text)] = l.toUpperCase();
+        }
+      });
     }
 
+    return {
+      qIndex: qNum,
+      text: ansText.question_text,
+      correct: (ansText.correct || "").trim().toUpperCase(),
+      options,
+    };
+  });
+
+  // 2. Pivot "long" sessions into "wide" participant objects
+  const participantMap = {};
+  sessions.forEach((row) => {
+    const sId = row.phpsession;
+    if (!sId) return;
+
+    if (!participantMap[sId]) {
+      participantMap[sId] = {
+        SessionID: sId,
+        "Prime UserID": row.user_id || "Unknown",
+        Team: (row.team_name || "Phoenix").trim(),
+        Discipline: "N/A", // Not present in DB files
+      };
+      // Pre-fill answers with fallback
+      qKeys.forEach((k) => (participantMap[sId][k] = "No Response"));
+    }
+
+    const qIdx = questionIdToQIndex[row.question_id];
+    if (qIdx) {
+      const text = optionIdToText[row.question_option_id];
+      participantMap[sId][`Q${qIdx}`] = text || "No Response";
+    }
+  });
+
+  return {
+    outcomes: Object.values(participantMap),
+    processedAnswers,
+    qKeys,
+  };
+}
+
+function calculateResults(
+  outcomes,
+  processedAnswers,
+  qKeys,
+  upToQuestionIndex,
+) {
+  const teams = {};
+  outcomes.forEach((row) => {
+    let teamName = (row.Team || "").trim();
+    if (!teamName || teamName.toLowerCase() === "noteamwalkin")
+      teamName = "Phoenix";
     if (!teams[teamName]) {
       teams[teamName] = {
         name: teamName,
         members: [],
         N: 0,
         scores: [],
-        correctPercentages: []
+        correctPercentages: [],
       };
     }
     teams[teamName].members.push(row);
@@ -55,131 +122,84 @@ function calculateResults(outcomes, processedAnswers, qKeys, upToQuestionIndex) 
   for (let q = 0; q < upToQuestionIndex; q++) {
     const qKey = qKeys[q];
     const questionInfo = processedAnswers[q];
-    if (!questionInfo) continue;
-
-    Object.values(teams).forEach(team => {
+    Object.values(teams).forEach((team) => {
       let correctCount = 0;
-      team.members.forEach(member => {
-        const rawAnswer = member[qKey];
-        const normalizedAnswer = normalizeString(rawAnswer);
-        const mappedLetter = questionInfo.options[normalizedAnswer] || '';
-        
-        if (mappedLetter === questionInfo.correct) {
+      team.members.forEach((member) => {
+        const norm = normalizeString(member[qKey]);
+        if (questionInfo.options[norm] === questionInfo.correct)
           correctCount += 1;
-        } else if (mappedLetter === '' && questionInfo.correct) {
-          if (normalizedAnswer === 'true' && questionInfo.options['true'] === questionInfo.correct) {
-            correctCount += 1;
-          } else if (normalizedAnswer === 'false' && questionInfo.options['false'] === questionInfo.correct) {
-            correctCount += 1;
-          }
-        }
       });
-
-      const qScore = team.N > 0 ? 10 * (correctCount / team.N) : 0;
-      team.scores.push(qScore);
-
-      const correctPercentage = team.N > 0 ? (correctCount / team.N) * 100 : 0;
-      team.correctPercentages.push(correctPercentage);
+      team.scores.push(team.N > 0 ? 10 * (correctCount / team.N) : 0);
+      team.correctPercentages.push(
+        team.N > 0 ? (correctCount / team.N) * 100 : 0,
+      );
     });
   }
 
   const currentQKey = qKeys[upToQuestionIndex - 1];
   const currentQInfo = processedAnswers[upToQuestionIndex - 1];
 
-const rankedTeams = Object.values(teams).map(team => {
-    const cumulativeScore = team.scores.reduce((sum, score) => sum + score, 0);
-    const avgConsensus = team.correctPercentages.length > 0 
-      ? team.correctPercentages.reduce((sum, pct) => sum + pct, 0) / team.correctPercentages.length
-      : 0;
-
-    // Capture stats for the single question currently in the snapshot
+  const rankedTeams = Object.values(teams).map((team) => {
     const qScore = team.scores[upToQuestionIndex - 1] || 0;
     const qConsensus = team.correctPercentages[upToQuestionIndex - 1] || 0;
-
     return {
       name: team.name,
-      score: Math.round(cumulativeScore * 100) / 100,
-      consensus: Math.round(avgConsensus * 100) / 100,
-      currentQuestionScore: Math.round(qScore * 100) / 100, // Points for this specific question
-      currentQuestionConsensus: Math.round(qConsensus * 100) / 100, // Consensus for this specific question
+      score: Math.round(team.scores.reduce((a, b) => a + b, 0) * 100) / 100,
+      consensus:
+        Math.round(
+          (team.correctPercentages.reduce((a, b) => a + b, 0) /
+            team.correctPercentages.length) *
+            100,
+        ) / 100,
+      currentQuestionScore: Math.round(qScore * 100) / 100,
+      currentQuestionConsensus: Math.round(qConsensus * 100) / 100,
       N: team.N,
-      members: team.members.map(m => {
-        const raw = m[currentQKey] || 'No Response';
-        const norm = normalizeString(raw);
-        const mapped = currentQInfo.options[norm] || '';
-        return {
-          sessionID: m.SessionID || 'Unknown', // Added SessionID from outcomes
-          id: m['Prime UserID'] || 'Unknown',
-          discipline: m['Discipline'] || 'N/A',
-          rawAnswer: raw,
-          isCorrect: mapped === currentQInfo.correct || (mapped === '' && norm === currentQInfo.correct.toLowerCase())
-        };
-      })
+      members: team.members.map((m) => ({
+        sessionID: m.SessionID,
+        id: m["Prime UserID"],
+        rawAnswer: m[currentQKey],
+        isCorrect:
+          normalizeString(m[currentQKey]) in currentQInfo.options &&
+          currentQInfo.options[normalizeString(m[currentQKey])] ===
+            currentQInfo.correct,
+      })),
     };
   });
 
-  rankedTeams.sort((a, b) => {
-    if (Math.abs(b.score - a.score) > 0.001) return b.score - a.score;
-    return b.consensus - a.consensus;
-  });
-
-  rankedTeams.forEach((team, index) => { team.rank = index + 1; });
-  return rankedTeams;
+  return rankedTeams
+    .sort((a, b) => b.score - a.score || b.consensus - a.consensus)
+    .map((t, i) => ({ ...t, rank: i + 1 }));
 }
 
-function generateAllSnapshots(outcomes, answers) {
-  const processedAnswers = processAnswers(answers);
-  const qKeys = getQuestionKeys(outcomes);
+function generateAllSnapshots(sessions, answersDb, answersText) {
+  const { outcomes, processedAnswers, qKeys } = transformData(
+    sessions,
+    answersDb,
+    answersText,
+  );
   const snapshots = [];
 
   for (let i = 1; i <= 8; i++) {
-    const questionInfo = processedAnswers[i - 1];
-    if (!questionInfo) continue;
-
-    let totalCorrect = 0;
-    let totalN = outcomes.length;
+    const qInfo = processedAnswers[i - 1];
     const qKey = qKeys[i - 1];
-
-    outcomes.forEach(member => {
-      const normalizedAnswer = normalizeString(member[qKey]);
-      const mappedLetter = questionInfo.options[normalizedAnswer] || '';
-      if (mappedLetter === questionInfo.correct) {
-        totalCorrect += 1;
-      } else if (mappedLetter === '' && questionInfo.correct) {
-        if (normalizedAnswer === 'true' && questionInfo.options['true'] === questionInfo.correct) {
-          totalCorrect += 1;
-        } else if (normalizedAnswer === 'false' && questionInfo.options['false'] === questionInfo.correct) {
-          totalCorrect += 1;
-        }
-      }
-    });
-
-    const classCorrectPercentage = totalN > 0 ? Math.round((totalCorrect / totalN) * 100) : 0;
-
-// Find the text that corresponds to the correct letter (e.g., "F")
-// Find the text that corresponds to the correct letter (e.g., "F")
-    // We normalize the search to handle any case or spacing issues
-    const correctOptionEntry = Object.entries(questionInfo.options).find(
-      ([text, letter]) => letter.toUpperCase() === questionInfo.correct.toUpperCase()
+    const correctCount = outcomes.filter(
+      (m) => qInfo.options[normalizeString(m[qKey])] === qInfo.correct,
+    ).length;
+    const correctText = Object.keys(qInfo.options).find(
+      (k) => qInfo.options[k] === qInfo.correct,
     );
-
-    let fullCorrectText = '';
-    if (correctOptionEntry) {
-      fullCorrectText = correctOptionEntry[0];
-    } else {
-
-      const rawAnswerKey = `answer_${questionInfo.correct.toLowerCase()}`;
-      fullCorrectText = answers[i - 1][rawAnswerKey] || questionInfo.correct;
-    }
 
     snapshots.push({
       questionIndex: i,
       questionInfo: {
-        text: questionInfo.text,
-        correctAnswer: fullCorrectText,
-        classCorrectPercentage: classCorrectPercentage
+        text: qInfo.text,
+        correctAnswer: correctText || qInfo.correct,
+        classCorrectPercentage:
+          outcomes.length > 0
+            ? Math.round((correctCount / outcomes.length) * 100)
+            : 0,
       },
-      leaderboard: calculateResults(outcomes, processedAnswers, qKeys, i)
+      leaderboard: calculateResults(outcomes, processedAnswers, qKeys, i),
     });
   }
   return snapshots;
