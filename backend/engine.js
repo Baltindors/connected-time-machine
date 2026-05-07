@@ -150,16 +150,26 @@ function generateAllSnapshots(outcomes, answers) {
     const classCorrectPercentage = totalN > 0 ? Math.round((totalCorrect / totalN) * 100) : 0;
 
 // Find the text that corresponds to the correct letter (e.g., "F")
+// Find the text that corresponds to the correct letter (e.g., "F")
+    // We normalize the search to handle any case or spacing issues
     const correctOptionEntry = Object.entries(questionInfo.options).find(
-      ([text, letter]) => letter === questionInfo.correct
+      ([text, letter]) => letter.toUpperCase() === questionInfo.correct.toUpperCase()
     );
-    const fullCorrectText = correctOptionEntry ? correctOptionEntry[0] : questionInfo.correct;
+
+    let fullCorrectText = '';
+    if (correctOptionEntry) {
+      fullCorrectText = correctOptionEntry[0];
+    } else {
+
+      const rawAnswerKey = `answer_${questionInfo.correct.toLowerCase()}`;
+      fullCorrectText = answers[i - 1][rawAnswerKey] || questionInfo.correct;
+    }
 
     snapshots.push({
       questionIndex: i,
       questionInfo: {
         text: questionInfo.text,
-        correctAnswer: fullCorrectText, // Now sends the full text like "EGD with biopsy..."
+        correctAnswer: fullCorrectText,
         classCorrectPercentage: classCorrectPercentage
       },
       leaderboard: calculateResults(outcomes, processedAnswers, qKeys, i)
