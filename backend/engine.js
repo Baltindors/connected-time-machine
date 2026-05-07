@@ -25,11 +25,6 @@ function processAnswers(answers) {
     .sort((a, b) => a.qIndex - b.qIndex);
 }
 
-function normalizeString(str) {
-  if (!str) return "";
-  return str.toString().trim().toLowerCase().replace(/\s+/g, " ");
-}
-
 /**
  * Bridges the new DB format to the structure the existing engine logic expects.
  */

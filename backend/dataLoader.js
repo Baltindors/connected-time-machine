@@ -2,10 +2,6 @@ const fs = require("fs");
 const path = require("path");
 const Papa = require("papaparse");
 
-const fs = require("fs");
-const path = require("path");
-const Papa = require("papaparse");
-
 function loadData() {
   const sessionsPath = path.join(
     __dirname,
